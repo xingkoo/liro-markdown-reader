@@ -11,6 +11,11 @@
     "version": "0.1.0"
   },
   "tauri": {
+    "allowlist": {
+      "dialog": {
+        "all": true
+      }
+    },
     "bundle": {
       "active": true,
       "identifier": "com.liro.markdown-reader",

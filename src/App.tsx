@@ -241,19 +241,29 @@ function App() {
   }
 
   async function openPicker(kind: 'file' | 'project') {
-    const selection = await open({
-      directory: kind === 'project',
-      multiple: false,
-      filters: kind === 'file' ? [{ name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'mkdn', 'txt'] }] : undefined
-    })
+    setStatus(kind === 'project' ? '正在选择项目目录...' : '正在选择 Markdown 文档...')
+    try {
+      const selection = await open({
+        title: kind === 'project' ? '选择 Markdown 项目目录' : '选择 Markdown 文档',
+        directory: kind === 'project',
+        multiple: false,
+        filters: kind === 'file' ? [{ name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'mkdn', 'txt'] }] : undefined
+      })
 
-    if (typeof selection !== 'string' || !selection) return
-    if (kind === 'project') {
-      await openProject(selection)
-      return
+      if (typeof selection !== 'string' || !selection) {
+        setStatus('已取消选择')
+        return
+      }
+      if (kind === 'project') {
+        await openProject(selection)
+        return
+      }
+      await openFile(selection)
+      setProjectRoot(dirname(selection) || null)
+    } catch (error) {
+      console.error('openPicker failed', error)
+      setStatus('打开文件选择器失败')
     }
-    await openFile(selection)
-    setProjectRoot(dirname(selection) || null)
   }
 
   function scrollToAnchor(hash: string) {
