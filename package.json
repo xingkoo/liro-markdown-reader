@@ -1,0 +1,30 @@
+{
+  "name": "@liro/markdown-reader",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "tauri": "tauri",
+    "bundle": "tauri build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^1.6.0",
+    "github-markdown-css": "^5.8.1",
+    "markdown-it": "^14.1.0",
+    "markdown-it-anchor": "^9.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@tauri-apps/cli": "^1.6.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.8.2",
+    "vite": "^5.4.14"
+  }
+}
