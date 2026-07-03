@@ -1,10 +1,11 @@
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { open } from '@tauri-apps/api/dialog'
 import { listen } from '@tauri-apps/api/event'
 import { HistoryEntry, AppHistory, TreeNode } from './types'
 import { renderMarkdown } from './markdown'
-import { dirname, fileName, resolveMarkdownLink, titleFromPath } from './path'
+import { dirname, fileName, joinPath, relativePath, resolveMarkdownLink, titleFromPath } from './path'
 
 type OpenedDocument = {
   filePath: string
@@ -61,9 +62,12 @@ function App() {
   const [projectRoot, setProjectRoot] = useState<string | null>(null)
   const [projectTree, setProjectTree] = useState<TreeNode[]>([])
   const [openedDocument, setOpenedDocument] = useState<OpenedDocument | null>(null)
+  const [editorText, setEditorText] = useState('')
+  const [viewMode, setViewMode] = useState<'preview' | 'edit'>('preview')
   const [status, setStatus] = useState('准备就绪')
   const [sidebarMode, setSidebarMode] = useState<'tree' | 'recent'>('tree')
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
+  const [sidebarWidth, setSidebarWidth] = useState(320)
   const viewerRef = useRef<HTMLDivElement | null>(null)
   const historyRef = useRef<AppHistory>({ recent: [] })
 
@@ -116,7 +120,7 @@ function App() {
       const link = target?.closest('a')
       if (!link) return
 
-      const href = link.getAttribute('href')
+      const href = link.getAttribute('data-liro-href') ?? link.getAttribute('href')
       if (!href || !openedDocument) return
 
       if (href.startsWith('#')) {
@@ -125,7 +129,7 @@ function App() {
         return
       }
 
-      const resolved = resolveMarkdownLink(openedDocument.filePath, href)
+      const resolved = resolveMarkdownLink(openedDocument.filePath, href, openedDocument.rootPath ?? projectRoot)
       if (resolved) {
         event.preventDefault()
         void handleLinkedNavigation(href, resolved)
@@ -135,11 +139,47 @@ function App() {
     const root = viewerRef.current
     root?.addEventListener('click', onClick)
     return () => root?.removeEventListener('click', onClick)
-  }, [openedDocument])
+  }, [openedDocument, projectRoot])
+
+  useEffect(() => {
+    if (sidebarMode !== 'tree' || !openedDocument) return
+
+    const frame = requestAnimationFrame(() => {
+      const activeRow = document.querySelector<HTMLElement>(`[data-tree-path="${CSS.escape(openedDocument.filePath)}"]`)
+      activeRow?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [openedDocument?.filePath, projectTree, sidebarMode])
+
+  useEffect(() => {
+    if (viewMode !== 'edit' || !openedDocument) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        void saveCurrentDocument()
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setViewMode('preview')
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [openedDocument, viewMode, editorText])
 
   const recentProjects = useMemo(() => history.recent.filter((entry) => entry.kind === 'project'), [history])
   const recentFiles = useMemo(() => history.recent.filter((entry) => entry.kind === 'file'), [history])
-  const activePath = openedDocument?.rootPath ?? openedDocument?.filePath ?? projectRoot ?? ''
+  const activeAbsolutePath = openedDocument?.filePath ?? projectRoot ?? ''
+  const activeRelativePath = openedDocument
+    ? relativePath(openedDocument.rootPath ?? projectRoot ?? dirname(openedDocument.filePath), openedDocument.filePath)
+    : ''
+  const previewHtml = useMemo(
+    () => (openedDocument && viewMode === 'preview' ? renderMarkdown(editorText) : ''),
+    [openedDocument, editorText, viewMode]
+  )
 
   async function persistHistory(next: AppHistory) {
     historyRef.current = next
@@ -162,7 +202,15 @@ function App() {
     const next = sortTree(tree)
     setProjectTree(next)
     if (next.length > 0) {
-      setExpandedDirs((current) => new Set(current).add(root))
+      setExpandedDirs((current) => {
+        const nextExpanded = new Set(current)
+        for (const node of next) {
+          if (node.kind === 'directory') {
+            nextExpanded.add(node.path)
+          }
+        }
+        return nextExpanded
+      })
     }
     return next
   }
@@ -170,6 +218,7 @@ function App() {
   async function openProject(rootPath: string, filePath?: string) {
     setStatus('正在打开项目...')
     setProjectRoot(rootPath)
+    setSidebarMode('tree')
     const tree = await loadProjectTree(rootPath)
 
     let target = filePath
@@ -197,13 +246,32 @@ function App() {
     const markdown = await invoke<string>('read_text_file', { filePath })
     const html = renderMarkdown(markdown)
     const title = titleFromPath(filePath)
+    const nextRoot = rootPath ?? dirname(filePath)
+    setProjectRoot(nextRoot)
+    setSidebarMode('tree')
+    setExpandedDirs((current) => {
+      const next = new Set(current)
+      let cursor = dirname(filePath)
+      while (cursor && cursor !== nextRoot) {
+        next.add(cursor)
+        const parent = dirname(cursor)
+        if (!parent || parent === cursor) break
+        cursor = parent
+      }
+      if (nextRoot) {
+        next.add(nextRoot)
+      }
+      return next
+    })
     setOpenedDocument({
       filePath,
-      rootPath,
+      rootPath: nextRoot,
       title,
       markdown,
       html
     })
+    setEditorText(markdown)
+    setViewMode('preview')
     setStatus(`已打开 ${fileName(filePath)}`)
     await recordHistory({
       kind: 'file',
@@ -227,7 +295,7 @@ function App() {
     }
 
     if (isMarkdownFile(resolvedPath)) {
-      const nextRoot = projectRoot ?? dirname(resolvedPath)
+      const nextRoot = openedDocument?.rootPath ?? projectRoot ?? dirname(resolvedPath)
       await openFile(resolvedPath, nextRoot)
       if (anchor) {
         requestAnimationFrame(() => scrollToAnchor(anchor))
@@ -235,8 +303,50 @@ function App() {
       return
     }
 
+    if (resolvedPath.endsWith('/')) {
+      const nextRoot = openedDocument?.rootPath ?? projectRoot ?? dirname(resolvedPath)
+      const directoryCandidates = [joinPath(resolvedPath, 'index.md'), joinPath(resolvedPath, 'README.md')]
+      for (const candidate of directoryCandidates) {
+        try {
+          await openFile(candidate, nextRoot)
+          if (anchor) {
+            requestAnimationFrame(() => scrollToAnchor(anchor))
+          }
+          return
+        } catch {
+          // Try the next conventional entry point.
+        }
+      }
+      setStatus(`目录链接未找到可打开的文档: ${rawHref}`)
+      return
+    }
+
     if (pathPart) {
       setStatus(`无法识别链接: ${rawHref}`)
+    }
+  }
+
+  async function saveCurrentDocument() {
+    if (!openedDocument) return
+    setStatus('正在保存...')
+    try {
+      await invoke('write_text_file', {
+        filePath: openedDocument.filePath,
+        content: editorText
+      })
+      setOpenedDocument((current) =>
+        current
+          ? {
+              ...current,
+              markdown: editorText,
+              html: renderMarkdown(editorText)
+            }
+          : current
+      )
+      setStatus(`已保存 ${fileName(openedDocument.filePath)}`)
+    } catch (error) {
+      console.error('saveCurrentDocument failed', error)
+      setStatus('保存失败')
     }
   }
 
@@ -282,16 +392,39 @@ function App() {
     })
   }
 
+  function beginResizeSidebar(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault()
+    const startX = event.clientX
+    const startWidth = sidebarWidth
+    document.body.classList.add('is-resizing-sidebar')
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const nextWidth = Math.max(260, Math.min(480, startWidth + (moveEvent.clientX - startX)))
+      setSidebarWidth(nextWidth)
+    }
+
+    const onUp = () => {
+      document.body.classList.remove('is-resizing-sidebar')
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   function renderTree(nodes: TreeNode[], depth = 0) {
     return (
       <ul className="tree-list">
         {nodes.map((node) => {
           const isOpen = expandedDirs.has(node.path)
           const isActive = openedDocument?.filePath === node.path
+          const hasChildren = node.kind === 'directory' && (node.children?.length ?? 0) > 0
           return (
             <li key={node.path} className={`tree-item depth-${depth}`}>
               <button
-                className={`tree-row ${isActive ? 'active' : ''}`}
+                data-tree-path={node.path}
+                className={`tree-row ${node.kind} ${isActive ? 'active' : ''}`}
                 onClick={async () => {
                   if (node.kind === 'directory') {
                     toggleExpanded(node.path)
@@ -300,10 +433,14 @@ function App() {
                   await openFile(node.path, projectRoot ?? dirname(node.path))
                 }}
               >
+                <span className={`tree-caret ${node.kind === 'directory' ? (isOpen ? 'open' : '') : 'leaf'}`}>▸</span>
                 <span className={`tree-icon ${node.kind}`} />
-                <span className="tree-name">{node.name}</span>
+                <span className="tree-row-text">
+                  <span className="tree-name">{node.name}</span>
+                  <span className="tree-meta">{node.relPath}</span>
+                </span>
               </button>
-              {node.kind === 'directory' && node.children?.length ? isOpen || depth === 0 ? renderTree(node.children, depth + 1) : null : null}
+              {hasChildren && isOpen ? <div className="tree-children">{renderTree(node.children ?? [], depth + 1)}</div> : null}
             </li>
           )
         })}
@@ -312,7 +449,7 @@ function App() {
   }
 
   return (
-    <div className="shell">
+    <div className="shell" style={{ '--sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
       <aside className="sidebar">
         <div className="brand">
           <div>
@@ -361,26 +498,59 @@ function App() {
         )}
       </aside>
 
+      <div className="sidebar-resizer" onPointerDown={beginResizeSidebar} role="separator" aria-orientation="vertical" aria-label="调整侧栏宽度" />
+
       <main className="content">
         <header className="topbar">
           <div className="topbar-title">
             <strong>{openedDocument?.title ?? 'Liro'}</strong>
-            <span>{activePath || '未打开内容'}</span>
+            <span>{activeAbsolutePath || '未打开内容'}</span>
           </div>
-          <div className="topbar-status">{status}</div>
+          <div className="topbar-actions">
+            {openedDocument ? (
+              <>
+                <button className={viewMode === 'preview' ? 'active' : ''} onClick={() => setViewMode('preview')}>
+                  预览
+                </button>
+                <button className={viewMode === 'edit' ? 'active' : ''} onClick={() => setViewMode('edit')}>
+                  编辑
+                </button>
+                <button className="save-button" onClick={() => void saveCurrentDocument()} disabled={!openedDocument || (viewMode === 'edit' && editorText === openedDocument.markdown)}>
+                  保存
+                </button>
+              </>
+            ) : null}
+            <div className="topbar-path">{activeRelativePath || ''}</div>
+            <div className="topbar-status">{status}</div>
+          </div>
         </header>
 
         <section className="viewer">
           {openedDocument ? (
-            <article
-              ref={viewerRef}
-              className="markdown-body"
-              dangerouslySetInnerHTML={{
-                __html:
-                  openedDocument.html +
-                  `<div class="viewer-meta"><hr /><p><strong>路径</strong> ${escapeHtml(openedDocument.filePath)}</p></div>`
-              }}
-            />
+            viewMode === 'preview' ? (
+              <article
+                ref={viewerRef}
+                className="markdown-body"
+                dangerouslySetInnerHTML={{
+                  __html:
+                    previewHtml +
+                    `<div class="viewer-meta"><hr /><p><strong>路径</strong> ${escapeHtml(openedDocument.filePath)}</p></div>`
+                }}
+              />
+            ) : (
+              <div className="editor-shell">
+                <div className="editor-toolbar">
+                  <span>Markdown 编辑器</span>
+                  <span>{editorText === openedDocument.markdown ? '未修改' : '已修改'}</span>
+                </div>
+                <textarea
+                  className="editor-textarea"
+                  value={editorText}
+                  onChange={(event) => setEditorText(event.target.value)}
+                  spellCheck={false}
+                />
+              </div>
+            )
           ) : (
             <div className="empty-hero">
               <h2>打开一个 Markdown 项目</h2>

@@ -42,6 +42,11 @@ fn read_text_file(file_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn write_text_file(file_path: String, content: String) -> Result<(), String> {
+  fs::write(&file_path, content).map_err(|err| format!("保存文件失败: {err}"))
+}
+
+#[tauri::command]
 fn load_history() -> Result<AppHistory, String> {
   let path = history_path()?;
   if !path.exists() {
@@ -149,6 +154,7 @@ fn main() {
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![
       read_text_file,
+      write_text_file,
       load_history,
       save_history,
       scan_project

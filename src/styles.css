@@ -41,6 +41,11 @@ body {
   overflow: hidden;
 }
 
+body.is-resizing-sidebar {
+  cursor: col-resize;
+  user-select: none;
+}
+
 button {
   border: 0;
   cursor: pointer;
@@ -49,10 +54,10 @@ button {
 
 .shell {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 320px) 10px minmax(0, 1fr);
   height: 100%;
   padding: 18px;
-  gap: 18px;
+  gap: 0;
 }
 
 .sidebar,
@@ -69,6 +74,29 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 280px;
+  min-height: 0;
+}
+
+.sidebar-resizer {
+  position: relative;
+  width: 10px;
+  margin: 0 8px;
+  border-radius: 999px;
+  cursor: col-resize;
+}
+
+.sidebar-resizer::before {
+  content: '';
+  position: absolute;
+  inset: 12px 3px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.32);
+  transition: background-color 160ms ease;
+}
+
+.sidebar-resizer:hover::before,
+body.is-resizing-sidebar .sidebar-resizer::before {
+  background: rgba(9, 105, 218, 0.65);
 }
 
 .brand {
@@ -153,6 +181,7 @@ button {
   margin-top: 16px;
   overflow: auto;
   flex: 1;
+  min-height: 0;
   padding-right: 4px;
 }
 
@@ -207,15 +236,43 @@ button {
   text-align: left;
 }
 
+.tree-row.directory {
+  font-weight: 600;
+}
+
 .tree-row.active {
   background: var(--accent-soft);
   color: var(--accent);
 }
 
-.tree-list .tree-list {
+.tree-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tree-children {
   margin-left: 18px;
   border-left: 1px dashed rgba(15, 23, 42, 0.1);
   padding-left: 10px;
+}
+
+.tree-caret {
+  width: 12px;
+  color: rgba(91, 100, 117, 0.8);
+  font-size: 12px;
+  flex: 0 0 auto;
+  transition: transform 160ms ease;
+}
+
+.tree-caret.open {
+  transform: rotate(90deg);
+}
+
+.tree-caret.leaf {
+  opacity: 0;
 }
 
 .tree-icon {
@@ -234,6 +291,17 @@ button {
 }
 
 .tree-name {
+  font-size: 14px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-meta {
+  color: rgba(91, 100, 117, 0.78);
+  font-size: 11px;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -243,6 +311,7 @@ button {
   border-radius: 28px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -273,6 +342,46 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.topbar-path {
+  color: rgba(91, 100, 117, 0.88);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 38ch;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.topbar-actions button {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--muted);
+}
+
+.topbar-actions button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.topbar-actions .save-button {
+  background: var(--accent);
+  color: white;
+}
+
+.topbar-actions .save-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .viewer {
@@ -333,6 +442,42 @@ button {
   line-height: 1.7;
 }
 
+.editor-shell {
+  max-width: 980px;
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.editor-textarea {
+  width: 100%;
+  min-height: calc(100vh - 230px);
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+  padding: 18px 20px;
+  font: inherit;
+  line-height: 1.7;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.editor-textarea:focus {
+  outline: 2px solid rgba(9, 105, 218, 0.2);
+  border-color: rgba(9, 105, 218, 0.35);
+}
+
 @media (max-width: 960px) {
   body {
     overflow: auto;
@@ -344,7 +489,15 @@ button {
     min-height: 100%;
   }
 
+  .sidebar-resizer {
+    display: none;
+  }
+
   .content {
     min-height: 72vh;
+  }
+
+  .editor-textarea {
+    min-height: 50vh;
   }
 }
