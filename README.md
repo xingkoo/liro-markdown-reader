@@ -1,5 +1,10 @@
 # Liro Markdown Reader
 
+## Languages
+
+- English
+- [中文](./README.zh-CN.md)
+
 Liro is a mac-first Markdown reader for individual documents and folder-based documentation projects.
 
 ## Features
@@ -53,6 +58,7 @@ git push origin v0.1.1
 ```
 
 That will trigger the GitHub Actions release workflow in [`.github/workflows/release.yml`](/Users/xing/Documents/Dev/Project/liro/.github/workflows/release.yml) and publish assets for macOS, Windows, and Linux.
+For the most reliable result, push the branch first and then push the tag separately.
 
 ## CI
 
