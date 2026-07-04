@@ -51,6 +51,8 @@ jobs:
             xdg-utils \
             desktop-file-utils \
             appstream \
+            dpkg-dev \
+            fakeroot \
             wget
 
       - name: install frontend dependencies
