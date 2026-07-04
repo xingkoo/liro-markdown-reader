@@ -53,8 +53,8 @@ npm run bundle
 推送一个以 `v` 开头的 tag，例如：
 
 ```bash
-git tag v0.1.9
-git push origin v0.1.9
+git tag v0.1.10
+git push origin v0.1.10
 ```
 
 这会触发 [`.github/workflows/release.yml`](/Users/xing/Documents/Dev/Project/liro/.github/workflows/release.yml) 中的 GitHub Actions 发布流程，并生成 macOS、Windows、Linux 的发布产物。
