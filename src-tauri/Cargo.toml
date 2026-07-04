@@ -1,6 +1,6 @@
 [package]
 name = "liro_markdown_reader"
-version = "0.1.11"
+version = "0.1.12"
 description = "Liro markdown reader"
 authors = ["xing"]
 license = ""
