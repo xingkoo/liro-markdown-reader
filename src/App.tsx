@@ -15,16 +15,7 @@ type OpenedDocument = {
   html: string
 }
 
-type ViewMode = 'split' | 'edit' | 'preview'
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
+type ViewMode = 'preview' | 'edit' | 'split'
 
 function sortTree(nodes: TreeNode[]): TreeNode[] {
   return [...nodes]
@@ -65,7 +56,7 @@ function App() {
   const [projectTree, setProjectTree] = useState<TreeNode[]>([])
   const [openedDocument, setOpenedDocument] = useState<OpenedDocument | null>(null)
   const [editorText, setEditorText] = useState('')
-  const [viewMode, setViewMode] = useState<ViewMode>('split')
+  const [viewMode, setViewMode] = useState<ViewMode>('preview')
   const [status, setStatus] = useState('准备就绪')
   const [sidebarMode, setSidebarMode] = useState<'tree' | 'recent'>('tree')
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set())
@@ -174,10 +165,10 @@ function App() {
 
   const recentProjects = useMemo(() => history.recent.filter((entry) => entry.kind === 'project'), [history])
   const recentFiles = useMemo(() => history.recent.filter((entry) => entry.kind === 'file'), [history])
-  const activeAbsolutePath = openedDocument?.filePath ?? projectRoot ?? ''
   const activeRelativePath = openedDocument
     ? relativePath(openedDocument.rootPath ?? projectRoot ?? dirname(openedDocument.filePath), openedDocument.filePath)
     : ''
+  const activeProjectPath = openedDocument?.rootPath ?? projectRoot ?? ''
   const previewHtml = useMemo(() => (openedDocument ? renderMarkdown(editorText) : ''), [openedDocument, editorText])
 
   async function persistHistory(next: AppHistory) {
@@ -218,7 +209,7 @@ function App() {
     setStatus('正在打开项目...')
     setProjectRoot(rootPath)
     setSidebarMode('tree')
-    setViewMode('split')
+    setViewMode('preview')
     const tree = await loadProjectTree(rootPath)
 
     let target = filePath
@@ -249,7 +240,7 @@ function App() {
     const nextRoot = rootPath ?? dirname(filePath)
     setProjectRoot(nextRoot)
     setSidebarMode('tree')
-    setViewMode('split')
+    setViewMode('preview')
     setExpandedDirs((current) => {
       const next = new Set(current)
       let cursor = dirname(filePath)
@@ -455,6 +446,7 @@ function App() {
           <div>
             <h1>Liro</h1>
             <p>Markdown Reader</p>
+            <div className="project-path">{activeProjectPath || '未打开项目'}</div>
           </div>
         </div>
 
@@ -502,28 +494,27 @@ function App() {
 
       <main className="content">
         <header className="topbar">
-          <div className="topbar-title">
-            <strong>{openedDocument?.title ?? 'Liro'}</strong>
-            <span>{activeAbsolutePath || '未打开内容'}</span>
+          <div className="topbar-main">
+            <div className="topbar-title">
+              <strong>{openedDocument?.title ?? 'Liro'}</strong>
+              <span>{activeRelativePath || '未打开内容'}</span>
+            </div>
           </div>
           <div className="topbar-actions">
-            {openedDocument ? (
-              <>
-                <button className={viewMode === 'split' ? 'active' : ''} onClick={() => setViewMode('split')}>
-                  分屏
-                </button>
-                <button className={viewMode === 'edit' ? 'active' : ''} onClick={() => setViewMode('edit')}>
-                  编辑
-                </button>
-                <button className={viewMode === 'preview' ? 'active' : ''} onClick={() => setViewMode('preview')}>
-                  预览
-                </button>
-                <button className="save-button" onClick={() => void saveCurrentDocument()} disabled={!openedDocument || (viewMode === 'edit' && editorText === openedDocument.markdown)}>
-                  保存
-                </button>
-              </>
+            <button className={viewMode === 'preview' ? 'active' : ''} onClick={() => setViewMode('preview')}>
+              预览
+            </button>
+            <button className={viewMode === 'edit' ? 'active' : ''} onClick={() => setViewMode('edit')}>
+              编辑
+            </button>
+            <button className={viewMode === 'split' ? 'active' : ''} onClick={() => setViewMode('split')}>
+              分屏
+            </button>
+            {viewMode === 'edit' ? (
+              <button className="save-button" onClick={() => void saveCurrentDocument()} disabled={!openedDocument || editorText === openedDocument.markdown}>
+                保存
+              </button>
             ) : null}
-            <div className="topbar-path">{activeRelativePath || ''}</div>
             <div className="topbar-status">{status}</div>
           </div>
         </header>
@@ -531,7 +522,7 @@ function App() {
         <section className="viewer">
           {openedDocument ? (
             <div className={`workspace workspace-${viewMode}`}>
-              {viewMode !== 'preview' ? (
+              {viewMode === 'edit' || viewMode === 'split' ? (
                 <div className="editor-shell">
                   <div className="editor-toolbar">
                     <span>Markdown 编辑器</span>
@@ -545,15 +536,11 @@ function App() {
                   />
                 </div>
               ) : null}
-              {viewMode !== 'edit' ? (
+              {viewMode === 'preview' || viewMode === 'split' ? (
                 <article
                   ref={viewerRef}
                   className="markdown-body preview-pane"
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      previewHtml +
-                      `<div class="viewer-meta"><hr /><p><strong>路径</strong> ${escapeHtml(openedDocument.filePath)}</p></div>`
-                  }}
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
                 />
               ) : null}
             </div>

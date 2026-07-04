@@ -101,10 +101,14 @@ body.is-resizing-sidebar .sidebar-resizer::before {
 
 .brand {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
+}
+
+.brand > div {
+  width: 100%;
+  min-width: 0;
 }
 
 .brand h1 {
@@ -117,6 +121,19 @@ body.is-resizing-sidebar .sidebar-resizer::before {
   margin: 4px 0 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.project-path {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-all;
+  max-width: 100%;
 }
 
 .sidebar-actions,
@@ -317,8 +334,9 @@ body.is-resizing-sidebar .sidebar-resizer::before {
 
 .topbar {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
   padding: 18px 22px;
   border-bottom: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.55);
@@ -333,24 +351,24 @@ body.is-resizing-sidebar .sidebar-resizer::before {
 
 .topbar-title strong {
   font-size: 16px;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-.topbar-title span,
-.topbar-status {
+.topbar-title span {
   color: var(--muted);
   font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-.topbar-path {
-  color: rgba(91, 100, 117, 0.88);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 38ch;
+.topbar-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .topbar-actions {
@@ -359,19 +377,21 @@ body.is-resizing-sidebar .sidebar-resizer::before {
   gap: 8px;
   min-width: 0;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .topbar-actions button {
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: rgba(148, 163, 184, 0.14);
+  padding: 8px 13px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.1);
   color: var(--muted);
+  border: 1px solid transparent;
 }
 
 .topbar-actions button.active {
-  background: var(--accent-soft);
+  background: rgba(9, 105, 218, 0.12);
   color: var(--accent);
+  border-color: rgba(9, 105, 218, 0.16);
 }
 
 .topbar-actions .save-button {
@@ -382,6 +402,15 @@ body.is-resizing-sidebar .sidebar-resizer::before {
 .topbar-actions .save-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.topbar-status {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .viewer {
