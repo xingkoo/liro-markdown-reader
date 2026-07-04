@@ -12,16 +12,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-latest
-          - platform: macos-latest
-          - platform: windows-latest
+          - platform: ubuntu-24.04
+          - platform: macos-14
+          - platform: windows-2022
     runs-on: ${{ matrix.platform }}
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: lts/*
 

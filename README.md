@@ -53,8 +53,8 @@ Notes:
 Push a tag that starts with `v`, for example:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 That will trigger the GitHub Actions release workflow in [`.github/workflows/release.yml`](/Users/xing/Documents/Dev/Project/liro/.github/workflows/release.yml) and publish assets for macOS, Windows, and Linux.
